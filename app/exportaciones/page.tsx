@@ -1,204 +1,183 @@
 "use client";
 
-import { useState } from "react";
-import { Download, RefreshCw } from "lucide-react";
-import { PageHeader, HeaderButton } from "@/components/PageHeader";
-import { StatusBadge } from "@/components/StatusBadge";
-import { DataTable, type Column } from "@/components/DataTable";
-import { exportDatasets, exportHistory, exportPresets, type ExportRecord } from "@/data/mock-data";
+import React, { useState } from "react";
+import {
+  Download,
+  FileText,
+  FileCode2,
+  Database,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  ExternalLink,
+  Layers,
+  Filter,
+  Plus,
+} from "lucide-react";
+import { useScraping } from "@/components/ScrapingContext";
 import { fmtNumber } from "@/lib/utils";
-
-const FORMATS = ["CSV", "JSON", "XLSX", "Google Sheets"];
-
-const STATUS_TONE: Record<ExportRecord["status"], "success" | "warning" | "info" | "danger"> = {
-  ready: "success",
-  expired: "warning",
-  running: "info",
-  failed: "danger",
-};
-const STATUS_LABEL: Record<ExportRecord["status"], string> = {
-  ready: "Listo",
-  expired: "Caducado",
-  running: "En curso",
-  failed: "Fallido",
-};
+import { exportJobsList, portals, type ExportJobRecord } from "@/data/mock-data";
 
 export default function ExportacionesPage() {
-  const [dataset, setDataset] = useState(exportDatasets[0].id);
-  const [format, setFormat] = useState("CSV");
-  const [toast, setToast] = useState<string | null>(null);
+  const { showToast } = useScraping();
+  const [selectedFormat, setSelectedFormat] = useState<"CSV" | "JSONL" | "PARQUET">("CSV");
+  const [selectedPortal, setSelectedPortal] = useState<string>("ALL");
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  function showToast(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2400);
-  }
-
-  const columns: Column<ExportRecord>[] = [
-    {
-      key: "name",
-      header: "Exportación",
-      render: (r) => (
-        <span className="font-bold text-foreground">
-          {r.name} {r.note && <span className="font-normal text-faint">— {r.note}</span>}
-        </span>
-      ),
-    },
-    { key: "date", header: "Fecha", render: (r) => r.date },
-    { key: "format", header: "Formato", render: (r) => r.format },
-    { key: "matches", header: "Coincidencias", className: "font-mono tabular-nums", render: (r) => fmtNumber(r.matches) },
-    { key: "duration", header: "Duración", className: "font-mono tabular-nums", render: (r) => r.duration },
-    { key: "status", header: "Estado", render: (r) => <StatusBadge tone={STATUS_TONE[r.status]} variant="classic">{STATUS_LABEL[r.status]}</StatusBadge> },
-    {
-      key: "action",
-      header: "",
-      render: (r) => (
-        <button
-          type="button"
-          onClick={() => showToast(r.status === "ready" ? `Descargando "${r.name}"… (simulado)` : "Reintentando exportación… (simulado)")}
-          className="font-bold text-primary hover:underline"
-        >
-          {r.status === "ready" ? "Descargar" : "Reintentar"}
-        </button>
-      ),
-    },
-  ];
+  const handleGenerateExport = () => {
+    setIsGenerating(true);
+    showToast(`Generando exportación ${selectedFormat} para ${selectedPortal === "ALL" ? "todas las fuentes" : selectedPortal}...`, "info");
+    window.setTimeout(() => {
+      setIsGenerating(false);
+      showToast(`✅ Exportación ${selectedFormat} generada con éxito · Descarga iniciada`, "success");
+    }, 1600);
+  };
 
   return (
-    <div className="relative">
-      <PageHeader
-        title="Exportaciones"
-        subtitle="Exporta ofertas por plataforma, país, categoría y formato"
-        variant="classic"
-        actions={
-          <>
-            <HeaderButton icon={<RefreshCw size={15} />}>Actualizar</HeaderButton>
-            <HeaderButton variant="primary" icon={<Download size={15} />} onClick={() => showToast("Exportación lanzada en segundo plano (simulado)")}>
-              Exportar ofertas
-            </HeaderButton>
-          </>
-        }
-      />
-
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted">Dataset</h2>
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {exportDatasets.map((d) => (
-          <button
-            key={d.id}
-            type="button"
-            onClick={() => setDataset(d.id)}
-            className={`rounded-xl p-3.5 text-left ring-1 transition-colors ${
-              dataset === d.id ? "bg-primary-soft ring-primary/50" : "bg-surface ring-border hover:ring-border-strong"
-            }`}
-          >
-            <div className="text-xl">{d.icon}</div>
-            <div className="mt-2 text-[13.5px] font-bold text-foreground">{d.title}</div>
-            <div className="mt-1 text-[11.5px] leading-snug text-muted">{d.description}</div>
-          </button>
-        ))}
+    <div className="flex flex-col gap-5">
+      {/* Header */}
+      <div className="flex flex-col justify-between gap-4 border-b border-border pb-4 sm:flex-row sm:items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-[22px] font-extrabold tracking-tight text-foreground sm:text-[24px]">
+              Exportaciones & Entrega de Datos
+            </h1>
+            <span className="rounded-md bg-primary/10 px-2 py-0.5 font-mono text-[11px] font-bold text-primary">
+              CSV · JSONL · Parquet
+            </span>
+          </div>
+          <p className="mt-1 text-[13px] text-muted">
+            Generador de volcados de base de datos con filtrado por fuente, esquema normalizado y descargas históricas.
+          </p>
+        </div>
       </div>
 
-      <div className="mb-4 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl bg-surface p-4 ring-1 ring-border">
-          <h2 className="mb-3 text-sm font-semibold text-foreground">Configuración</h2>
-          <div className="mb-3">
-            <label className="mb-1.5 block text-[10.5px] font-semibold uppercase tracking-widest text-muted">Formato</label>
-            <div className="flex flex-wrap gap-1.5">
-              {FORMATS.map((f) => (
+      {/* Generator Configuration Card */}
+      <div className="rounded-2xl border border-border bg-surface p-5 shadow-xs">
+        <h2 className="text-[15px] font-bold text-foreground mb-4">Configurar Nueva Exportación</h2>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {/* Format selector */}
+          <div>
+            <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-muted">
+              Formato de Salida
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {(["CSV", "JSONL", "PARQUET"] as const).map((fmt) => (
                 <button
-                  key={f}
+                  key={fmt}
                   type="button"
-                  onClick={() => setFormat(f)}
-                  className={`rounded-lg border px-3 py-1.5 text-[12.5px] font-bold ${
-                    format === f ? "border-primary bg-primary-soft text-primary" : "border-border-strong bg-surface text-foreground"
+                  onClick={() => setSelectedFormat(fmt)}
+                  className={`rounded-xl border py-2.5 font-mono text-[12.5px] font-bold transition-all ${
+                    selectedFormat === fmt
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-surface-raised text-muted hover:text-foreground"
                   }`}
                 >
-                  {f}
+                  {fmt}
                 </button>
               ))}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <SelectField label="Plataforma" options={["Todas", "InfoJobs", "Computrabajo", "Manpower"]} />
-            <SelectField label="País · 21 disp." options={["Todos", "España", "México", "Francia"]} />
-            <SelectField label="Categoría · 182 disp." options={["Todas"]} />
-            <SelectField label="Modalidad" options={["Todas", "Remoto", "Híbrido", "Presencial"]} />
+
+          {/* Portal scope */}
+          <div>
+            <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-muted">
+              Alcance de Fuentes
+            </label>
+            <select
+              value={selectedPortal}
+              onChange={(e) => setSelectedPortal(e.target.value)}
+              className="w-full rounded-xl border border-border bg-surface-raised px-3 py-2.5 text-[13px] font-medium text-foreground focus:border-primary focus:outline-none"
+            >
+              <option value="ALL">Todas las fuentes (1.289.450 ofertas)</option>
+              {portals.map((p) => (
+                <option key={p.id} value={p.name}>
+                  {p.countryFlag} {p.name} ({fmtNumber(p.offers)} ofertas)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date range */}
+          <div>
+            <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-muted">
+              Ventana Temporal
+            </label>
+            <select className="w-full rounded-xl border border-border bg-surface-raised px-3 py-2.5 text-[13px] font-medium text-foreground focus:border-primary focus:outline-none">
+              <option>Catálogo Completo Activo</option>
+              <option>Últimas 24 horas (Incremental)</option>
+              <option>Últimos 7 días</option>
+              <option>Últimos 30 días</option>
+            </select>
           </div>
         </div>
 
-        <div className="rounded-xl bg-surface p-4 ring-1 ring-border">
-          <h2 className="mb-3 text-sm font-semibold text-foreground">Presets · filtros guardados</h2>
-          <div className="mb-4 flex flex-wrap gap-1.5">
-            {exportPresets.map((p) => (
-              <span key={p} className="rounded-full border border-border bg-surface-raised px-2.5 py-1 text-[11.5px] font-semibold text-muted">
-                {p}
-              </span>
-            ))}
-          </div>
-          <div className="mb-2 flex items-center gap-2">
-            <h3 className="text-[13px] font-bold text-foreground">Resumen de exportación</h3>
-            <StatusBadge tone="success" variant="classic">
-              Listo
-            </StatusBadge>
-          </div>
-          <dl className="grid grid-cols-2 gap-3 text-[12.5px]">
-            <div>
-              <dt className="text-faint">Dataset</dt>
-              <dd className="font-bold text-foreground">{exportDatasets.find((d) => d.id === dataset)?.title}</dd>
-            </div>
-            <div>
-              <dt className="text-faint">Formato</dt>
-              <dd className="font-bold text-foreground">{format}</dd>
-            </div>
-            <div>
-              <dt className="text-faint">Registros estimados</dt>
-              <dd className="font-bold text-foreground">No calculado</dd>
-            </div>
-            <div>
-              <dt className="text-faint">Destino</dt>
-              <dd className="font-bold text-foreground">Archivo</dd>
-            </div>
-          </dl>
+        <div className="mt-5 flex justify-end">
           <button
             type="button"
-            onClick={() => showToast("Calculando registros… (simulado)")}
-            className="mt-3 rounded-lg border border-border-strong px-3 py-1.5 text-xs font-bold text-foreground hover:bg-surface-raised"
+            onClick={handleGenerateExport}
+            disabled={isGenerating}
+            className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-[13px] font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-transform active:scale-[0.99] disabled:opacity-60"
           >
-            Calcular registros
+            <Download size={15} />
+            {isGenerating ? "Generando fichero..." : `Generar y Descargar ${selectedFormat}`}
           </button>
         </div>
       </div>
 
-      <div className="rounded-xl bg-surface p-4 ring-1 ring-border">
-        <div className="mb-3 flex items-center gap-2.5">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">Mis exportaciones</h2>
-            <span className="text-[11.5px] text-faint">Se ejecutan en el servidor · puedes cerrar y volver</span>
+      {/* History Table */}
+      <div className="flex flex-col gap-3">
+        <h3 className="text-[14px] font-bold text-foreground">Historial de Exportaciones Generadas</h3>
+
+        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-2xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[12.5px]">
+              <thead className="border-b border-border bg-surface-raised text-[10.5px] font-bold uppercase tracking-wider text-faint">
+                <tr>
+                  <th className="px-4 py-3">Nombre del Archivo</th>
+                  <th className="px-4 py-3">Formato</th>
+                  <th className="px-4 py-3">Fuentes Incluidas</th>
+                  <th className="px-4 py-3 text-right">Registros</th>
+                  <th className="px-4 py-3 text-right">Tamaño</th>
+                  <th className="px-4 py-3">Fecha de Creación</th>
+                  <th className="px-4 py-3 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {exportJobsList.map((job) => (
+                  <tr key={job.id} className="hover:bg-surface-raised/60 transition-colors">
+                    <td className="px-4 py-3 font-mono font-bold text-foreground flex items-center gap-2">
+                      <FileText size={15} className="text-primary" />
+                      <span>{job.fileName}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="rounded bg-surface-raised px-2 py-0.5 font-mono text-[10.5px] font-bold text-foreground">
+                        {job.format}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-muted">{job.portalScope}</td>
+                    <td className="px-4 py-3 text-right font-mono font-bold text-foreground">
+                      {fmtNumber(job.recordsCount)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-muted">{job.fileSizeBytes}</td>
+                    <td className="px-4 py-3 text-muted">{job.createdAt}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => showToast(`Iniciando descarga de ${job.fileName}…`, "success")}
+                        className="inline-flex items-center gap-1 rounded-lg bg-surface-raised px-2.5 py-1 text-[11.5px] font-bold text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+                      >
+                        <Download size={12} /> Descargar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <button type="button" className="ml-auto rounded-lg border border-border-strong px-3 py-1.5 text-xs font-bold text-foreground hover:bg-surface-raised">
-            Actualizar
-          </button>
         </div>
-        <DataTable columns={columns} rows={exportHistory} variant="classic" />
       </div>
-
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-control bg-foreground px-4 py-2.5 text-[13px] font-semibold text-background shadow-lg">
-          {toast}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SelectField({ label, options }: { label: string; options: string[] }) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-[10.5px] font-semibold uppercase tracking-widest text-muted">{label}</label>
-      <select className="h-9 w-full rounded-lg border border-border-strong bg-surface px-2.5 text-[13px] text-foreground">
-        {options.map((o) => (
-          <option key={o}>{o}</option>
-        ))}
-      </select>
     </div>
   );
 }

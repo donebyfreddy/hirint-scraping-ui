@@ -12,6 +12,19 @@ export function fmtPct(n: number, digits = 1): string {
   return `${n.toLocaleString("es-ES", { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
 }
 
+/** es-ES currency formatting: 45000 -> "45.000 €" */
+export function fmtCurrency(amount: number, currency = "EUR"): string {
+  try {
+    return new Intl.NumberFormat("es-ES", {
+      style: "currency",
+      currency: currency || "EUR",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `${fmtNumber(amount)} ${currency}`;
+  }
+}
+
 export type Tone = "success" | "warning" | "info" | "danger" | "accent" | "neutral";
 
 export const toneVar: Record<Tone, string> = {

@@ -1,0 +1,6 @@
+{
+  "name": "Hirint Scraping Suite",
+  "description": "Visual UX prototype of the Hirint Scraping Suite for managing portal scraping, jobs, ATS discovery, data quality auditing, and data exports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

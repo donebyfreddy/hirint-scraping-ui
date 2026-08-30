@@ -1,164 +1,274 @@
 "use client";
 
-import { useState } from "react";
-import { RefreshCw, Settings2 } from "lucide-react";
-import { PageHeader, HeaderButton } from "@/components/PageHeader";
-import { TabNav } from "@/components/TabNav";
-import { MetricCard } from "@/components/MetricCard";
-import { DataTable, type Column } from "@/components/DataTable";
-import { StatusBadge } from "@/components/StatusBadge";
-import { DetailDrawer } from "@/components/DetailDrawer";
-import { atsProviders, atsResults, atsDailyTrend, type AtsResult } from "@/data/mock-data";
+import React, { useState } from "react";
+import {
+  Building2,
+  Search,
+  Plus,
+  Play,
+  CheckCircle2,
+  AlertTriangle,
+  ExternalLink,
+  Code2,
+  RotateCw,
+  Clock,
+  Sparkles,
+} from "lucide-react";
+import { useScraping } from "@/components/ScrapingContext";
 import { fmtNumber } from "@/lib/utils";
 
-const STATUS_TONE: Record<AtsResult["status"], "success" | "warning" | "info"> = {
-  new: "info",
-  existing: "success",
-  "needs-review": "warning",
-};
-const STATUS_LABEL: Record<AtsResult["status"], string> = {
-  new: "Nuevo",
-  existing: "Existente",
-  "needs-review": "Revisar",
-};
+interface AtsCompany {
+  id: string;
+  name: string;
+  atsType: "Workday" | "Greenhouse" | "Lever" | "SmartRecruiters" | "Personio" | "Ashby";
+  careerUrl: string;
+  activeJobsCount: number;
+  lastScraped: string;
+  status: "HEALTHY" | "WARNING" | "BLOCKED";
+}
+
+const sampleAtsCompanies: AtsCompany[] = [
+  {
+    id: "ats-1",
+    name: "Glovo",
+    atsType: "Greenhouse",
+    careerUrl: "https://boards.greenhouse.io/glovo",
+    activeJobsCount: 142,
+    lastScraped: "hace 18 min",
+    status: "HEALTHY",
+  },
+  {
+    id: "ats-2",
+    name: "Cabify",
+    atsType: "Lever",
+    careerUrl: "https://jobs.lever.co/cabify",
+    activeJobsCount: 89,
+    lastScraped: "hace 45 min",
+    status: "HEALTHY",
+  },
+  {
+    id: "ats-3",
+    name: "Santander Tech",
+    atsType: "Workday",
+    careerUrl: "https://santander.wd3.myworkdayjobs.com/SantanderCareers",
+    activeJobsCount: 420,
+    lastScraped: "hace 2 horas",
+    status: "HEALTHY",
+  },
+  {
+    id: "ats-4",
+    name: "Wallbox",
+    atsType: "SmartRecruiters",
+    careerUrl: "https://careers.smartrecruiters.com/Wallbox",
+    activeJobsCount: 35,
+    lastScraped: "hace 3 horas",
+    status: "HEALTHY",
+  },
+  {
+    id: "ats-5",
+    name: "TravelPerk",
+    atsType: "Ashby",
+    careerUrl: "https://jobs.ashbyhq.com/travelperk",
+    activeJobsCount: 68,
+    lastScraped: "hace 1 hora",
+    status: "HEALTHY",
+  },
+  {
+    id: "ats-6",
+    name: "Factorial HR",
+    atsType: "Personio",
+    careerUrl: "https://factorialhr.personio.de",
+    activeJobsCount: 54,
+    lastScraped: "hace 4 horas",
+    status: "HEALTHY",
+  },
+];
 
 export default function AtsScraperPage() {
-  const [tab, setTab] = useState("dashboard");
-  const [result, setResult] = useState<AtsResult | null>(null);
+  const { showToast } = useScraping();
+  const [search, setSearch] = useState("");
+  const [atsFilter, setAtsFilter] = useState<string>("ALL");
+  const [isScrapingAll, setIsScrapingAll] = useState(false);
 
-  const uniqueCompanies = new Set(atsResults.map((r) => r.company)).size;
-  const totalFindings = atsProviders.reduce((s, p) => s + p.count, 0);
+  const filtered = sampleAtsCompanies.filter((c) => {
+    if (atsFilter !== "ALL" && c.atsType !== atsFilter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return c.name.toLowerCase().includes(q) || c.atsType.toLowerCase().includes(q);
+    }
+    return true;
+  });
 
-  const columns: Column<AtsResult>[] = [
-    { key: "company", header: "Empresa", render: (r) => <span className="font-bold text-foreground">{r.company}</span> },
-    { key: "domain", header: "Dominio", render: (r) => <span className="font-mono text-muted">{r.domain}</span> },
-    { key: "provider", header: "Provider", render: (r) => r.provider },
-    { key: "careersUrl", header: "Careers URL", render: (r) => <span className="font-mono text-muted">{r.careersUrl}</span> },
-    { key: "discoveredAt", header: "Descubierto", render: (r) => r.discoveredAt },
-    { key: "status", header: "Estado", render: (r) => <StatusBadge tone={STATUS_TONE[r.status]} variant="classic">{STATUS_LABEL[r.status]}</StatusBadge> },
-  ];
+  const totalJobs = filtered.reduce((acc, c) => acc + c.activeJobsCount, 0);
 
-  const maxTrend = Math.max(...atsDailyTrend);
+  const handleScrapeAll = () => {
+    setIsScrapingAll(true);
+    showToast("Iniciando workers de extracción para 42 ATS empresariales...", "info");
+    window.setTimeout(() => {
+      setIsScrapingAll(false);
+      showToast("✅ Scraping de ATS completado: 808 ofertas sincronizadas", "success");
+    }, 1800);
+  };
 
   return (
-    <div>
-      <PageHeader
-        title="ATS Scraper"
-        subtitle="Qué se ha encontrado, qué es nuevo y cómo evoluciona por ejecución"
-        variant="classic"
-        actions={
-          <>
-            <HeaderButton icon={<RefreshCw size={15} />}>Actualizar</HeaderButton>
-            <HeaderButton variant="primary" icon={<Settings2 size={15} />} onClick={() => setTab("config")}>
-              Configuración y ejecución
-            </HeaderButton>
-          </>
-        }
-      />
-
-      <div className="mb-4">
-        <TabNav
-          tabs={[
-            { value: "dashboard", label: "Dashboard de resultados" },
-            { value: "config", label: "Configuración" },
-          ]}
-          active={tab}
-          onChange={setTab}
-          variant="classic"
-        />
-      </div>
-
-      {tab === "dashboard" ? (
-        <>
-          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <MetricCard variant="classic" label="Total hallazgos" value={fmtNumber(totalFindings)} />
-            <MetricCard variant="classic" label="Empresas únicas" value={String(uniqueCompanies)} />
-            <MetricCard variant="classic" label="URLs de empleo" value={fmtNumber(totalFindings)} sub="100% del total" />
-            <MetricCard variant="classic" label="Providers detectados" value="7/7" accent="var(--success)" />
-            <MetricCard variant="classic" label="Necesitan revisión" value={String(atsResults.filter((r) => r.status === "needs-review").length)} accent="var(--warning)" />
-            <MetricCard variant="classic" label="Nuevos (última ejec.)" value={String(atsResults.filter((r) => r.status === "new").length)} accent="var(--info)" />
+    <div className="flex flex-col gap-5">
+      {/* Header */}
+      <div className="flex flex-col justify-between gap-4 border-b border-border pb-4 sm:flex-row sm:items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-[22px] font-extrabold tracking-tight text-foreground sm:text-[24px]">
+              ATS Direct Scraper
+            </h1>
+            <span className="rounded-md bg-primary/10 px-2 py-0.5 font-mono text-[11px] font-bold text-primary">
+              Empresas Directas & Páginas Career
+            </span>
           </div>
+          <p className="mt-1 text-[13px] text-muted">
+            Extracción directa desde portales de empleo corporativos: Workday, Greenhouse, Lever, SmartRecruiters, Personio y Ashby.
+          </p>
+        </div>
 
-          <div className="mb-4 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-xl bg-surface p-4 ring-1 ring-border">
-              <h2 className="mb-4 text-sm font-semibold text-foreground">Hallazgos por provider</h2>
-              <div className="flex flex-col gap-2">
-                {atsProviders.map((p) => (
-                  <div key={p.name} className="flex items-center gap-3">
-                    <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: p.color }} />
-                    <span className="w-24 flex-none text-[12.5px] font-semibold text-foreground">{p.name}</span>
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-raised">
-                      <div className="h-full rounded-full" style={{ width: `${p.pct}%`, background: p.color }} />
-                    </div>
-                    <span className="w-10 flex-none text-right font-mono text-[11.5px] tabular-nums text-faint">{p.pct}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-surface p-4 ring-1 ring-border">
-              <h2 className="mb-4 text-sm font-semibold text-foreground">Evolución diaria · últimos 30 días</h2>
-              <svg viewBox={`0 0 ${atsDailyTrend.length * 12} 60`} className="h-32 w-full" preserveAspectRatio="none">
-                <polyline
-                  fill="none"
-                  stroke="var(--primary)"
-                  strokeWidth="2"
-                  points={atsDailyTrend.map((v, i) => `${i * 12},${60 - (v / maxTrend) * 55}`).join(" ")}
-                />
-              </svg>
-              <div className="mt-2 flex items-center gap-1.5">
-                <StatusBadge tone="accent" variant="classic">
-                  Hallazgos por día
-                </StatusBadge>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl bg-surface p-4 ring-1 ring-border">
-            <h2 className="mb-3 text-sm font-semibold text-foreground">Resultados recientes</h2>
-            <DataTable columns={columns} rows={atsResults} variant="classic" onRowClick={setResult} />
-          </div>
-        </>
-      ) : (
-        <div className="max-w-xl rounded-xl bg-surface p-4 ring-1 ring-border">
-          <h2 className="mb-4 text-sm font-semibold text-foreground">Configuración y ejecución</h2>
-          <ConfigField label="Providers a rastrear" value="Teamtailor, Beetween, Talentclue, Bizneo, Viterbit, Velora HR, Workday" />
-          <ConfigField label="Frecuencia" value="Diario · 07:00" />
-          <ConfigField label="Fuente de dominios" value="Empresas detectadas en Scraping + lista manual" />
-          <button type="button" className="mt-2 w-full rounded-lg bg-primary py-2.5 text-[13.5px] font-bold text-primary-foreground">
-            Ejecutar ATS Discovery ahora
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => showToast("Formulario para añadir nueva empresa ATS en desarrollo", "info")}
+            className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-[12.5px] font-bold text-foreground hover:bg-surface-raised transition-colors"
+          >
+            <Plus size={14} /> Añadir Empresa
+          </button>
+          <button
+            type="button"
+            onClick={handleScrapeAll}
+            disabled={isScrapingAll}
+            className="flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-[12.5px] font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-transform active:scale-[0.99] disabled:opacity-60"
+          >
+            <Play size={14} />
+            {isScrapingAll ? "Extrayendo ATS..." : "Lanzar Scraping ATS"}
           </button>
         </div>
-      )}
+      </div>
 
-      <DetailDrawer open={!!result} onClose={() => setResult(null)} title={result?.company ?? ""} subtitle={result?.domain} width={460}>
-        {result && (
-          <div className="flex flex-col gap-3.5 text-[13px]">
-            <Row label="Provider ATS" value={result.provider} />
-            <Row label="Careers URL" value={result.careersUrl} mono />
-            <Row label="Descubierto" value={result.discoveredAt} />
-            <Row label="Estado" value={STATUS_LABEL[result.status]} />
-          </div>
-        )}
-      </DetailDrawer>
-    </div>
-  );
-}
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-2xl border border-border bg-surface p-4">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Empresas Monitorizadas</span>
+          <div className="mt-1 font-mono text-[24px] font-bold text-foreground">42</div>
+          <span className="text-[11.5px] text-faint">6 sistemas ATS soportados</span>
+        </div>
 
-function ConfigField({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="mb-3">
-      <label className="mb-1.5 block text-[10.5px] font-semibold uppercase tracking-widest text-muted">{label}</label>
-      <div className="rounded-lg bg-surface-raised px-3 py-2 text-[13px] text-foreground">{value}</div>
-    </div>
-  );
-}
+        <div className="rounded-2xl border border-border bg-surface p-4">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Ofertas Directas Activas</span>
+          <div className="mt-1 font-mono text-[24px] font-bold text-success">{fmtNumber(totalJobs)}</div>
+          <span className="text-[11.5px] text-faint">100% fuentes primarias</span>
+        </div>
 
-function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div>
-      <div className="text-[10.5px] font-bold uppercase tracking-widest text-faint">{label}</div>
-      <div className={mono ? "font-mono text-foreground" : "font-bold text-foreground"}>{value}</div>
+        <div className="rounded-2xl border border-border bg-surface p-4">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Precisión Salarios</span>
+          <div className="mt-1 font-mono text-[24px] font-bold text-primary">82.4%</div>
+          <span className="text-[11.5px] text-faint">Rangos oficiales de RRHH</span>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-surface p-4">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Estado de Conexión</span>
+          <div className="mt-1 font-mono text-[24px] font-bold text-success">Nominal</div>
+          <span className="text-[11.5px] text-faint">APIs de ATS respondiendo</span>
+        </div>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-3 shadow-2xs">
+        <div className="relative flex-1 min-w-[240px] max-w-sm">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+          <input
+            type="text"
+            placeholder="Buscar empresa, tipo de ATS..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-border bg-surface-raised py-1.5 pl-8 pr-3 text-[12.5px] text-foreground placeholder:text-faint focus:border-primary focus:outline-none"
+          />
+        </div>
+
+        <div className="flex items-center gap-1.5 overflow-x-auto text-[11.5px] font-medium">
+          {[
+            { id: "ALL", label: "Todos los ATS" },
+            { id: "Greenhouse", label: "Greenhouse" },
+            { id: "Lever", label: "Lever" },
+            { id: "Workday", label: "Workday" },
+            { id: "SmartRecruiters", label: "SmartRecruiters" },
+            { id: "Personio", label: "Personio" },
+            { id: "Ashby", label: "Ashby" },
+          ].map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setAtsFilter(f.id)}
+              className={`rounded-lg px-2.5 py-1 transition-colors ${
+                atsFilter === f.id
+                  ? "bg-primary text-primary-foreground font-bold"
+                  : "bg-surface-raised text-muted hover:text-foreground"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Companies Table */}
+      <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-2xs">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-[12.5px]">
+            <thead className="border-b border-border bg-surface-raised text-[10.5px] font-bold uppercase tracking-wider text-faint">
+              <tr>
+                <th className="px-4 py-3">Empresa</th>
+                <th className="px-4 py-3">Sistema ATS</th>
+                <th className="px-4 py-3">URL Career Oficial</th>
+                <th className="px-4 py-3 text-right">Ofertas Activas</th>
+                <th className="px-4 py-3 text-right">Último Scrape</th>
+                <th className="px-4 py-3 text-right">Acción</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filtered.map((company) => (
+                <tr key={company.id} className="hover:bg-surface-raised/60 transition-colors">
+                  <td className="px-4 py-3 font-bold text-foreground flex items-center gap-2">
+                    <Building2 size={16} className="text-primary" />
+                    <span>{company.name}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="rounded bg-surface-raised px-2 py-0.5 font-mono text-[11px] font-bold text-foreground">
+                      {company.atsType}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <a
+                      href={company.careerUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 font-mono text-[11px] text-muted hover:text-primary transition-colors"
+                    >
+                      {company.careerUrl.replace("https://", "")} <ExternalLink size={12} />
+                    </a>
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono font-bold text-foreground">
+                    {company.activeJobsCount}
+                  </td>
+                  <td className="px-4 py-3 text-right text-muted">{company.lastScraped}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => showToast(`Scrapeando ATS de ${company.name}…`, "info")}
+                      className="rounded bg-surface-raised px-2.5 py-1 text-[11px] font-semibold text-muted hover:bg-primary hover:text-primary-foreground transition-colors"
+                    >
+                      Scrapear
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

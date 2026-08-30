@@ -18,9 +18,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Hirint Scraping Suite — Prototipo",
+  title: "Hirint Scraping Suite",
   description:
-    "Prototipo visual (UX) de la Scraping Suite de Hirint. Datos simulados, sin backend real. Para handoff a Builded.io.",
+    "Visual UX prototype of the Hirint Scraping Suite for managing portal scraping, jobs, ATS discovery, data quality auditing, and data exports.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -1,194 +1,311 @@
 "use client";
 
-import { useState } from "react";
-import { Play, FlaskConical, ToggleLeft, ToggleRight, RefreshCw, CheckCircle2 } from "lucide-react";
-import { PageHeader, HeaderButton } from "@/components/PageHeader";
-import { MetricCard } from "@/components/MetricCard";
-import { PortalCard } from "@/components/PortalCard";
-import { portals } from "@/data/mock-data";
-import { fmtNumber } from "@/lib/utils";
+import React, { useState } from "react";
+import {
+  Globe,
+  Play,
+  FlaskConical,
+  RefreshCw,
+  Search,
+  Filter,
+  Layers,
+  ArrowUpRight,
+  Sliders,
+  CheckCircle2,
+  AlertTriangle,
+  Zap,
+  FileCode2,
+} from "lucide-react";
+import { PortalStatusBadge, CatalogueStatusBadge } from "@/components/StatusBadge";
+import { useScraping } from "@/components/ScrapingContext";
+import { fmtNumber, fmtPct } from "@/lib/utils";
+import { portals, type Portal, type CountryCode } from "@/data/mock-data";
 
-const TEST_OPTIONS = [5, 10, 25, 50];
+export default function SourcesScrapingPage() {
+  const { setSelectedPortal, setSelectedCensusPortalId, showToast } = useScraping();
 
-export default function ScrapingPage() {
-  const [selectedId, setSelectedId] = useState(portals[0].id);
-  const [syncCategories, setSyncCategories] = useState(true);
-  const [proxyOn, setProxyOn] = useState(true);
-  const [testCount, setTestCount] = useState(10);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<null | { found: number; ms: number }>(null);
-  const [starting, setStarting] = useState(false);
+  const [search, setSearch] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState<string>("ALL");
+  const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
 
-  const selected = portals.find((p) => p.id === selectedId)!;
-  const healthy = portals.filter((p) => p.status === "healthy").length;
-  const warning = portals.filter((p) => p.status === "warning").length;
-  const critical = portals.filter((p) => p.status === "critical").length;
+  const countries = [
+    { code: "ALL", label: "Todos los países" },
+    { code: "ES", label: "🇪🇸 España" },
+    { code: "MX", label: "🇲🇽 México" },
+    { code: "CO", label: "🇨🇴 Colombia" },
+    { code: "AR", label: "🇦🇷 Argentina" },
+    { code: "CL", label: "🇨🇱 Chile" },
+    { code: "PE", label: "🇵🇪 Perú" },
+  ];
 
-  function runTest() {
-    setTesting(true);
-    setTestResult(null);
-    window.setTimeout(() => {
-      setTesting(false);
-      setTestResult({ found: Math.max(1, testCount - Math.round(Math.random() * 2)), ms: 1200 + Math.round(Math.random() * 2400) });
-    }, 1400);
-  }
+  const filteredPortals = portals.filter((p) => {
+    if (selectedCountry !== "ALL" && p.countryCode !== selectedCountry) return false;
+    if (selectedStatus !== "ALL" && p.status !== selectedStatus) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        p.name.toLowerCase().includes(q) ||
+        p.country.toLowerCase().includes(q) ||
+        p.scrapingStrategy.toLowerCase().includes(q) ||
+        p.proxyProvider.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
 
-  function runStart() {
-    setStarting(true);
-    window.setTimeout(() => setStarting(false), 1600);
-  }
+  const totalOffers = filteredPortals.reduce((acc, p) => acc + p.offers, 0);
 
   return (
-    <div>
-      <PageHeader
-        title="Scraping"
-        subtitle="Descubre ofertas de los portales ETT configurados"
-        variant="classic"
-        actions={<HeaderButton icon={<RefreshCw size={15} />}>Actualizar</HeaderButton>}
-      />
-
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <MetricCard variant="classic" label="Portales" value={String(portals.length)} sub="configurados" />
-        <MetricCard variant="classic" label="Al día" value={String(healthy)} accent="var(--success)" />
-        <MetricCard variant="classic" label="Con avisos" value={String(warning)} accent="var(--warning)" />
-        <MetricCard variant="classic" label="Bloqueados" value={String(critical)} accent="var(--danger)" />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+    <div className="flex flex-col gap-5">
+      {/* Header */}
+      <div className="flex flex-col justify-between gap-4 border-b border-border pb-4 sm:flex-row sm:items-center">
         <div>
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted">Portales ({portals.length})</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {portals.map((p) => (
-              <PortalCard key={p.id} portal={p} selected={p.id === selectedId} onSelect={() => setSelectedId(p.id)} />
-            ))}
+          <div className="flex items-center gap-2">
+            <h1 className="text-[22px] font-extrabold tracking-tight text-foreground sm:text-[24px]">
+              Fuentes & Portales de Empleo
+            </h1>
+            <span className="rounded-md bg-primary/10 px-2 py-0.5 font-mono text-[11px] font-bold text-primary">
+              {filteredPortals.length} fuentes
+            </span>
           </div>
+          <p className="mt-1 text-[13px] text-muted">
+            Configuración, estrategias de extracción (REST/Playwright/Scrapy), censo de IDs y gestión de proxies Webshare.
+          </p>
         </div>
 
-        <div className="flex flex-col gap-4">
-          <div className="rounded-xl bg-surface p-4 ring-1 ring-border">
-            <h2 className="mb-3 text-sm font-semibold text-foreground">{selected.name} · Configuración</h2>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => showToast("Sincronizando taxonomía de todas las fuentes...", "info")}
+            className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-[12.5px] font-bold text-foreground hover:bg-surface-raised transition-colors"
+          >
+            <RefreshCw size={13} /> Sincronizar Taxonomías
+          </button>
+          <button
+            type="button"
+            onClick={() => showToast("Lanzando lote de scraping para las fuentes filtradas...", "info")}
+            className="flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-[12.5px] font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-transform active:scale-[0.99]"
+          >
+            <Play size={14} /> Lanzar Lote ({filteredPortals.length})
+          </button>
+        </div>
+      </div>
 
-            <Field label="País">
-              <select className="h-9 w-full rounded-lg border border-border-strong bg-surface px-2.5 text-[13px] text-foreground">
-                <option>{selected.country}</option>
-              </select>
-            </Field>
+      {/* Filter Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-3 shadow-2xs">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+          <input
+            type="text"
+            placeholder="Buscar por nombre, país, estrategia..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-border bg-surface-raised py-1.5 pl-8 pr-3 text-[12.5px] text-foreground placeholder:text-faint focus:border-primary focus:outline-none"
+          />
+        </div>
 
-            <Field label="Categoría · 34 disp.">
-              <select className="h-9 w-full rounded-lg border border-border-strong bg-surface px-2.5 text-[13px] text-foreground">
-                <option>Todas</option>
-                <option>Tecnología</option>
-                <option>Comercial</option>
-                <option>Logística</option>
-              </select>
-            </Field>
+        {/* Country Filter Tabs */}
+        <div className="flex items-center gap-1 overflow-x-auto text-[12px] font-medium">
+          {countries.map((c) => (
+            <button
+              key={c.code}
+              type="button"
+              onClick={() => setSelectedCountry(c.code)}
+              className={`rounded-lg px-2.5 py-1 transition-colors ${
+                selectedCountry === c.code
+                  ? "bg-primary text-primary-foreground font-bold"
+                  : "bg-surface-raised text-muted hover:text-foreground"
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
 
-            <ToggleRow
-              label="Sincronizar categorías"
-              hint="Valida la taxonomía nativa del portal antes de rastrear"
-              on={syncCategories}
-              onToggle={() => setSyncCategories((v) => !v)}
-            />
-            <ToggleRow
-              label="Proxy Webshare"
-              hint={proxyOn ? `Salida ${selected.region} · Proxy Webshare` : "Salida directa · sin proxy"}
-              on={proxyOn}
-              onToggle={() => setProxyOn((v) => !v)}
-            />
+        {/* Status Dropdown / View toggle */}
+        <div className="flex items-center gap-2">
+          <select
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            className="rounded-lg border border-border bg-surface-raised px-2.5 py-1.5 text-[12px] font-medium text-foreground focus:border-primary focus:outline-none"
+          >
+            <option value="ALL">Todos los estados</option>
+            <option value="healthy">Al día (Healthy)</option>
+            <option value="running">En ejecución (Running)</option>
+            <option value="warning">Con avisos (Warning)</option>
+            <option value="blocked">Bloqueados (Blocked)</option>
+          </select>
 
-            <div className="mt-4 border-t border-border pt-4">
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted">Probar ofertas</div>
-              <div className="mb-3 flex gap-1.5">
-                {TEST_OPTIONS.map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setTestCount(n)}
-                    className={`flex-1 rounded-lg py-1.5 text-[12.5px] font-bold ${
-                      testCount === n ? "bg-primary text-primary-foreground" : "bg-surface-raised text-muted"
-                    }`}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={runTest}
-                disabled={testing}
-                className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-border-strong bg-surface py-2 text-[13px] font-bold text-foreground hover:bg-surface-raised disabled:opacity-60"
-              >
-                <FlaskConical size={15} />
-                {testing ? "Probando…" : `Probar ${testCount} ofertas`}
-              </button>
-
-              {testResult && (
-                <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-[12.5px] font-semibold" style={{ background: "var(--success-soft)", color: "var(--success)" }}>
-                  <CheckCircle2 size={15} />
-                  {testResult.found} ofertas encontradas en {(testResult.ms / 1000).toFixed(1)} s
-                </div>
-              )}
-            </div>
-
+          <div className="hidden sm:flex rounded-lg border border-border bg-surface-raised p-0.5 text-[11px] font-bold">
             <button
               type="button"
-              onClick={runStart}
-              disabled={starting}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-[13.5px] font-bold text-primary-foreground disabled:opacity-70"
+              onClick={() => setViewMode("table")}
+              className={`rounded px-2 py-1 transition-colors ${
+                viewMode === "table" ? "bg-surface text-foreground shadow-2xs" : "text-muted"
+              }`}
             >
-              <Play size={15} />
-              {starting ? "Iniciando…" : "Iniciar scraping"}
+              Tabla
             </button>
-          </div>
-
-          <div className="rounded-xl bg-surface p-4 ring-1 ring-border">
-            <h2 className="mb-1 text-sm font-semibold text-foreground">Resumen</h2>
-            <dl className="grid grid-cols-2 gap-3 text-[12.5px]">
-              <div>
-                <dt className="text-faint">Ofertas capturadas</dt>
-                <dd className="font-mono font-bold text-foreground">{fmtNumber(selected.offers)}</dd>
-              </div>
-              <div>
-                <dt className="text-faint">Media diaria</dt>
-                <dd className="font-mono font-bold text-foreground">{selected.dailyAvg}/día</dd>
-              </div>
-              <div>
-                <dt className="text-faint">Cobertura</dt>
-                <dd className="font-mono font-bold text-foreground">{selected.coverage.toFixed(1)}%</dd>
-              </div>
-              <div>
-                <dt className="text-faint">Categorías</dt>
-                <dd className="font-bold text-foreground">{selected.categoriesSynced ? "Sincronizadas" : "Pendiente"}</dd>
-              </div>
-            </dl>
+            <button
+              type="button"
+              onClick={() => setViewMode("cards")}
+              className={`rounded px-2 py-1 transition-colors ${
+                viewMode === "cards" ? "bg-surface text-foreground shadow-2xs" : "text-muted"
+              }`}
+            >
+              Tarjetas
+            </button>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-3">
-      <label className="mb-1.5 block text-[10.5px] font-semibold uppercase tracking-widest text-muted">{label}</label>
-      {children}
-    </div>
-  );
-}
-
-function ToggleRow({ label, hint, on, onToggle }: { label: string; hint: string; on: boolean; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="mb-3 flex w-full items-center gap-2.5 rounded-lg bg-surface-raised px-3 py-2.5 text-left"
-    >
-      {on ? <ToggleRight size={20} className="flex-none text-primary" /> : <ToggleLeft size={20} className="flex-none text-faint" />}
-      <div className="min-w-0">
-        <div className="text-[12.5px] font-bold text-foreground">{label}</div>
-        <div className="truncate text-[11px] text-faint">{hint}</div>
+      {/* Summary Strip */}
+      <div className="flex items-center justify-between text-[12px] text-muted">
+        <span>
+          Mostrando <strong className="text-foreground">{filteredPortals.length}</strong> fuentes con un total de{" "}
+          <strong className="font-mono text-foreground">{fmtNumber(totalOffers)}</strong> ofertas activas
+        </span>
       </div>
-    </button>
+
+      {/* Table View */}
+      {viewMode === "table" ? (
+        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-2xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[12.5px]">
+              <thead className="border-b border-border bg-surface-raised text-[10.5px] font-bold uppercase tracking-wider text-faint">
+                <tr>
+                  <th className="px-4 py-3">Fuente / Portal</th>
+                  <th className="px-4 py-3">Estado Operativo</th>
+                  <th className="px-4 py-3">Completitud Catálogo</th>
+                  <th className="px-4 py-3 text-right">Ofertas BD</th>
+                  <th className="px-4 py-3 text-right">Censo Fuente</th>
+                  <th className="px-4 py-3 text-right">Cobertura</th>
+                  <th className="px-4 py-3 text-right">Velocidad</th>
+                  <th className="px-4 py-3 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredPortals.map((portal) => (
+                  <tr
+                    key={portal.id}
+                    onClick={() => setSelectedPortal(portal)}
+                    className="cursor-pointer transition-colors hover:bg-surface-raised/70"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-[18px]">{portal.countryFlag}</span>
+                        <div>
+                          <div className="font-bold text-foreground hover:text-primary transition-colors">
+                            {portal.name}
+                          </div>
+                          <div className="text-[11px] text-muted">
+                            {portal.country} · <span className="font-mono">{portal.scrapingStrategy}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <PortalStatusBadge status={portal.status} />
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <CatalogueStatusBadge status={portal.catalogueStatus} />
+                    </td>
+
+                    <td className="px-4 py-3 text-right font-mono font-bold text-foreground">
+                      {fmtNumber(portal.offers)}
+                    </td>
+
+                    <td className="px-4 py-3 text-right font-mono text-muted">
+                      {portal.sourceLiveTotal > 0 ? fmtNumber(portal.sourceLiveTotal) : "N/D"}
+                    </td>
+
+                    <td className="px-4 py-3 text-right font-mono font-bold text-primary">
+                      {fmtPct(portal.coverage)}
+                    </td>
+
+                    <td className="px-4 py-3 text-right font-mono text-foreground">
+                      {portal.throughput > 0 ? `${portal.throughput}/min` : "—"}
+                    </td>
+
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCensusPortalId(portal.id)}
+                          title="Inspeccionar censo de IDs nativos"
+                          className="rounded-lg bg-surface-raised p-1.5 text-muted hover:bg-primary hover:text-primary-foreground transition-colors"
+                        >
+                          <FileCode2 size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPortal(portal)}
+                          title="Lanzador y parámetros"
+                          className="flex items-center gap-1 rounded-lg bg-primary/10 px-2.5 py-1 text-[11.5px] font-bold text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+                        >
+                          <Play size={12} /> Config
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        /* Card Grid View */
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredPortals.map((portal) => (
+            <div
+              key={portal.id}
+              onClick={() => setSelectedPortal(portal)}
+              className="cursor-pointer rounded-2xl border border-border bg-surface p-4 transition-all hover:border-primary/40 hover:bg-surface-raised hover:shadow-md"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-[20px]">{portal.countryFlag}</span>
+                  <div>
+                    <h3 className="font-bold text-foreground text-[14px]">{portal.name}</h3>
+                    <span className="text-[11px] text-muted">{portal.country} · {portal.region}</span>
+                  </div>
+                </div>
+                <PortalStatusBadge status={portal.status} />
+              </div>
+
+              <div className="mt-3">
+                <CatalogueStatusBadge status={portal.catalogueStatus} />
+              </div>
+
+              <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border/60 pt-3 text-center">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-muted">Ofertas</span>
+                  <div className="font-mono text-[16px] font-bold text-foreground">{fmtNumber(portal.offers)}</div>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-muted">Cobertura</span>
+                  <div className="font-mono text-[16px] font-bold text-primary">{fmtPct(portal.coverage)}</div>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-muted">Velocidad</span>
+                  <div className="font-mono text-[16px] font-bold text-foreground">{portal.throughput}/m</div>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between text-[11.5px] text-muted border-t border-border/40 pt-2.5">
+                <span className="font-mono text-[10.5px]">Egress: {portal.proxyExitCountry}</span>
+                <span className="font-bold text-primary flex items-center gap-1">
+                  Abrir ficha <ArrowUpRight size={13} />
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

@@ -1,56 +1,106 @@
+"use client";
+
+import React from "react";
+import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+interface MetricCardProps {
+  label: string;
+  value: string | number;
+  sub?: string;
+  accent?: string;
+  tone?: "success" | "warning" | "danger" | "info" | "neutral" | "accent";
+  icon?: React.ReactNode;
+  trend?: {
+    value: string;
+    isPositive?: boolean;
+  };
+  onClick?: () => void;
+  clickableHint?: string;
+  className?: string;
+}
 
 export function MetricCard({
   label,
   value,
   sub,
-  variant = "suite",
   accent,
-  delta,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  variant?: "suite" | "classic";
-  accent?: string; // css color for stripe/value tint
-  delta?: { value: string; direction: "up" | "down" };
-}) {
-  if (variant === "classic") {
-    return (
-      <div className="rounded-xl bg-surface p-3.5 ring-1 ring-border">
-        <div className="text-[10px] font-semibold uppercase tracking-widest text-muted">{label}</div>
-        <div className="mt-1.5 font-mono text-xl font-bold tabular-nums text-foreground" style={accent ? { color: accent } : undefined}>
-          {value}
-        </div>
-        {sub && <div className="mt-1 text-[11px] text-faint">{sub}</div>}
-      </div>
-    );
-  }
+  tone,
+  icon,
+  trend,
+  onClick,
+  clickableHint,
+  className,
+}: MetricCardProps) {
+  const isClickable = Boolean(onClick);
 
   return (
-    <div className="relative min-w-0 overflow-hidden rounded-card border border-border bg-surface p-4 shadow-subtle">
-      {accent && <div className="absolute inset-y-0 left-0 w-[3px]" style={{ background: accent }} />}
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] font-bold uppercase tracking-[.05em] text-muted">{label}</span>
-        {delta && (
+    <div
+      onClick={onClick}
+      role={isClickable ? "button" : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (isClickable && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+      className={cn(
+        "group relative flex flex-col justify-between rounded-xl border border-border bg-surface p-4 transition-all duration-150",
+        isClickable
+          ? "cursor-pointer hover:-translate-y-0.5 hover:border-primary/50 hover:bg-surface-raised/80 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/40"
+          : "",
+        className
+      )}
+    >
+      {/* Top row: Label & Icon / Drilldown indicator */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11.5px] font-semibold uppercase tracking-wider text-muted group-hover:text-foreground">
+          {label}
+        </span>
+        <div className="flex items-center gap-1.5">
+          {icon && <span className="text-muted group-hover:text-primary">{icon}</span>}
+          {isClickable && (
+            <ArrowUpRight
+              size={14}
+              className="text-faint opacity-40 transition-opacity group-hover:text-primary group-hover:opacity-100"
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Main value */}
+      <div className="my-2 flex items-baseline gap-2">
+        <span
+          className="font-mono text-[24px] font-bold tracking-tight tabular-nums text-foreground sm:text-[26px]"
+          style={accent ? { color: accent } : tone ? { color: `var(--${tone})` } : undefined}
+        >
+          {value}
+        </span>
+
+        {trend && (
           <span
             className={cn(
-              "inline-flex items-center gap-0.5 rounded-[6px] px-1.5 py-0.5 text-[11px] font-bold",
-              delta.direction === "up" ? "text-success" : "text-danger"
+              "font-mono text-[11.5px] font-semibold tabular-nums",
+              trend.isPositive ? "text-success" : "text-danger"
             )}
-            style={{ background: delta.direction === "up" ? "var(--success-soft)" : "var(--danger-soft)" }}
           >
-            {delta.direction === "up" ? "▲" : "▼"} {delta.value}
+            {trend.value}
           </span>
         )}
       </div>
-      <div
-        className="mt-2 overflow-hidden text-ellipsis font-mono text-[29px] font-extrabold leading-none tracking-tight tabular-nums"
-        style={accent ? { color: accent } : undefined}
-      >
-        {value}
-      </div>
-      {sub && <div className="mt-1.5 text-[11.5px] font-semibold text-faint">{sub}</div>}
+
+      {/* Bottom Subtext / Helper */}
+      {(sub || clickableHint) && (
+        <div className="flex items-center justify-between text-[11.5px] leading-tight">
+          {sub && <span className="text-muted">{sub}</span>}
+          {clickableHint && isClickable && (
+            <span className="ml-auto font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
+              {clickableHint} →
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
